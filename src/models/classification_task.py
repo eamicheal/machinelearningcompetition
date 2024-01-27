@@ -3,7 +3,7 @@
 """
 Classification Task
 
-Author: Timothy Eze
+Author: Aniebiet Micheal Ezekiel
 Date: January 27, 2024
 
 This script contains the implementation of a machine learning project with various classifiers,

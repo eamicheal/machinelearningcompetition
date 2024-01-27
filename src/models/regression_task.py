@@ -3,7 +3,7 @@
 """
 Regression Task
 
-Author: Timothy Eze
+Author: Aniebiet Micheal Ezekiel
 Date: January 27, 2024
 
 This script contains the implementation of a machine learning project with various classifiers,
@@ -67,44 +67,3 @@ class AutoGluonRegressor:
         result_df = pd.DataFrame({'Id': test_data['Id'], 'Predicted': predictions})
         result_df.to_csv(self.result_save_path, index=False)
         print(result_df)
-
-
-
-"""
-class AutoGluonRegressor:
-    def __init__(self, train_file_path, label_file_path, test_file_path, model_save_path, result_save_path):
-        self.train_file_path = train_file_path
-        self.label_file_path = label_file_path
-        self.test_file_path = test_file_path
-        self.model_save_path = model_save_path
-        self.result_save_path = result_save_path
-
-    def load_and_preprocess_data(self):
-        # Load and preprocess training data
-        predictor = TabularPredictor(label='rating', problem_type='regression', eval_metric='root_mean_squared_error', path='ag_experiment')
-        train_data = TabularDataset(self.train_file_path)
-
-        # Manually add the label column to train_data
-        train_data['rating'] = pd.read_csv(self.label_file_path)['rating']
-
-        # Fit the model
-        predictor.fit(train_data, presets="best_quality")
-
-        return predictor
-
-    def predict_and_save_results(self, predictor):
-        # Load test features
-        test_data = TabularDataset(self.test_file_path)
-
-        # Use the trained Autogluon model for prediction
-        predictions = predictor.predict(test_data)
-
-        # Save the best model
-        predictor.save(self.model_save_path)
-
-        # Save predictions to a CSV file
-        result_df = pd.DataFrame({'Id': test_data['Id'], 'Predicted': predictions})
-        result_df.to_csv(self.result_save_path, index=False)
-
-        print(result_df)
-"""
