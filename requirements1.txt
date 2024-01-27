@@ -1,0 +1,13 @@
+# local package
+-e .
+
+# external requirements
+autogluon
+pandas
+scikit-learn
+joblib
+catboost
+imbalanced-learn
+catboost
+scikit-optimize
+xgboost
