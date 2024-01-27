@@ -8,7 +8,7 @@
 # Import necessary libraries and modules
 import os
 import argparse
-from src.models.classification_task import CatBoostClassifierKaggle
+from src.models.classification_task import CatBoostClassifierTrainer
 from src.models.classification_task import CatBoostClassifier
 from src.models.classification_task import AutoGluonClassifierTrainer
 from src.models.classification_task import RandomForestClassifierTrainer
@@ -34,13 +34,13 @@ CLASS_COMMON_PATHS = {
     'test_file_path': 'data/classification/test_features.csv',
     'result_save_path': 'results/classification/',
     'catboost_model_save_path': 'models/trained_model_catboost.pkl',
-    'catboost_model_save_path_kaggle': 'models/trained_model_catboost_kaggle.pkl',
+    'catboost_model_save_path_trainer': 'models/trained_model_catboost_trainer.pkl',
     'autogluon_model_save_path': 'models/trained_model_autogluon.pkl',
     'randomforest_model_save_path': 'models/trained_model_rf.pkl',
     'model_save_path_ag': 'models/trained_model_ag.pkl',
     'relative_result_save_path_ag': 'prediction_autogluon.csv',
     'relative_result_save_path_catboost': 'prediction_catboost.csv',
-    'relative_result_save_path_catboost_kaggle': 'prediction_catboost_kaggle.csv',
+    'relative_result_save_path_catboost_trainer': 'prediction_catboost_trainer.csv',
     'relative_result_save_path_rf': 'prediction_rf.csv',
 }
 
@@ -62,7 +62,7 @@ def main():
     if args.classifier == "catboosthyp":
         run_catboost_classifier(CLASS_COMMON_PATHS)
     elif args.classifier == "classification":
-        run_catboost_kaggle(CLASS_COMMON_PATHS)
+        run_catboost_trainer(CLASS_COMMON_PATHS)
     elif args.classifier == "autogluontrain":
         run_autogluon_classifier_train(CLASS_COMMON_PATHS)
     elif args.classifier == "randomforest":
@@ -73,17 +73,17 @@ def main():
         print("Invalid classifier choice. Use --help for available options.")
 
 
-def run_catboost_kaggle(class_common_paths):
-    # Run CatBoost Kaggle task
+def run_catboost_trainer(class_common_paths):
+    # Run CatBoost Trainer task
     train_file_path = class_common_paths['train_file_path']
     train_label_file_path = class_common_paths['train_label_file_path']
     test_file_path = class_common_paths['test_file_path']
-    model_save_path = class_common_paths['catboost_model_save_path_kaggle']
+    model_save_path = class_common_paths['catboost_model_save_path_trainer']
     relative_result_save_path = class_common_paths['result_save_path'] + class_common_paths[
-        'relative_result_save_path_catboost_kaggle']
+        'relative_result_save_path_catboost_trainer']
 
     # Create CatBoostTrainer instance
-    catboost_trainer = CatBoostClassifierKaggle(train_file_path, train_label_file_path, test_file_path, model_save_path, relative_result_save_path)
+    catboost_trainer = CatBoostClassifierTrainer(train_file_path, train_label_file_path, test_file_path, model_save_path, relative_result_save_path)
 
     # Read and prepare data
     X_train, X_val, y_train, y_val = catboost_trainer.read_and_prepare_data()

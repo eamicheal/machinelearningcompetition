@@ -21,6 +21,10 @@ from autogluon.tabular import TabularPredictor
 from autogluon.multimodal.presets import get_automm_presets
 from autogluon.multimodal import MultiModalPredictor
 
+# display imports
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 # Scikit-learn imports
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -40,57 +44,6 @@ import xgboost as xgb
 
 # Joblib for model persistence
 import joblib
-
-
-# class AutoGluonClassifierTrainer:
-#     def __init__(self, train_file_path, train_label_file_path, test_file_path, model_save_path, result_save_path):
-#         self.train_file_path = train_file_path
-#         self.train_label_file_path = train_label_file_path
-#         self.test_file_path = test_file_path
-#         self.model_save_path = model_save_path
-#         self.result_save_path = result_save_path
-#         self.label_column = 'label'
-#         self.features_to_remove = ['feature_2', 'feature_12', 'feature_22']
-#         self.predictor = None
-#
-#     def read_data(self):
-#         train_data = pd.read_csv(self.train_file_path)
-#         train_labels = pd.read_csv(self.train_label_file_path)
-#
-#         train_data = self.prepare_data(train_data, train_labels)
-#         X = train_data.drop(self.label_column, axis=1)
-#         y = train_data[self.label_column]
-#
-#         return X, y, train_data
-#
-#     def prepare_data(self, data, labels):
-#         data = data.drop(self.features_to_remove, axis=1)
-#         data['label'] = labels['label']
-#         return data
-#
-#     def train_and_predict(self):
-#         self.train_autogluon_classifier()
-#         self.predict_and_save_results()
-#
-#     def train_autogluon_classifier(self):
-#         hyperparameters, hyperparameter_tune_kwargs = self.get_automm_presets()
-#         self.predictor = TabularPredictor(
-#             label=self.label_column, eval_metric='f1', path=self.model_save_path
-#         ).fit(self.train_data, hyperparameters='default', presets="best_quality", time_limit=3600)
-#
-#     def get_automm_presets(self):
-#         from autogluon.multimodal.presets import get_automm_presets
-#         return get_automm_presets(problem_type="default", presets="high_quality_hpo")
-#
-#     def predict_and_save_results(self):
-#         test_features = pd.read_csv(self.test_file_path)
-#         test_features = self.prepare_data(test_features, pd.DataFrame())
-#
-#         predictions_ag = self.predictor.predict(test_features)
-#         result_df = pd.DataFrame({'Id': test_features['Id'], 'Predicted_Label': predictions_ag})
-#
-#         result_df.to_csv(self.result_save_path, index=False)
-#         print(result_df)
 
 
 # Class to handle training and prediction with AutoGluon for a classification task
@@ -343,11 +296,182 @@ class CatBoostClassifier:
 
 from catboost import CatBoostClassifier  ## import CatBoostClassifier
 
-# Class to handle training, evaluation, and prediction with CatBoost for the Kaggle competition
-class CatBoostClassifierKaggle:
+# Class to handle training, evaluation, and prediction with CatBoost for the main classification task
+class CatBoostClassifierTrainer:
     def __init__(self, train_file_path, train_label_file_path, test_file_path, model_save_path, result_save_path):
         """
-        Initialize CatBoostClassifierKaggle instance.
+        Initialize CatBoostClassifierTrainer instance.
+
+        Parameters:
+        - train_file_path (str): Path to the training features CSV file.
+        - train_label_file_path (str): Path to the training labels CSV file.
+        - test_file_path (str): Path to the test features CSV file.
+        - model_save_path (str): Path to save the trained CatBoost model.
+        - result_save_path (str): Path to save the prediction results.
+        """
+        self.train_file_path = train_file_path
+        self.train_label_file_path = train_label_file_path
+        self.test_file_path = test_file_path
+        self.model_save_path = model_save_path
+        self.result_save_path = result_save_path
+        self.features_to_remove = ['feature_2']  # based on data analysis, has no correlation
+        self.label_column = 'label'
+        self.scaler = StandardScaler()
+        self.catboost_classifier = CatBoostClassifier(iterations=100, depth=5, learning_rate=0.1,
+                                                      l2_leaf_reg=1.0, random_state=42, verbose=0)
+
+    def read_and_prepare_data(self):
+        """
+        Read and prepare training data.
+
+        Returns:
+        - X_train, X_val, y_train, y_val: Prepared training and validation sets.
+        """
+        # Read training dataset
+        train_data = pd.read_csv(self.train_file_path)
+        train_labels = pd.read_csv(self.train_label_file_path)
+
+        # Handle missing values
+        missing_values = train_data.isna().sum()
+        if missing_values.any():
+            print("Missing Values in Each Column:")
+            print(missing_values)
+        else:
+            print("No Missing Values")
+
+        # Remove specified features
+        train_data = train_data.drop(self.features_to_remove, axis=1)
+
+        # Combine features and labels
+        train_data[self.label_column] = train_labels[self.label_column]
+
+        # Split into features and target variable
+        X = train_data.drop(self.label_column, axis=1)
+        y = train_data[self.label_column]
+
+        # Feature scaling using Standard Scaling
+        X_scaled = self.scaler.fit_transform(X)
+
+        # Handle class imbalance using SMOTE
+        smote = SMOTE(random_state=42)
+        X_resampled, y_resampled = smote.fit_resample(X_scaled, y)
+
+        # Split the resampled dataset into training and validation sets
+        X_train, X_val, y_train, y_val = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+
+        return X_train, X_val, y_train, y_val
+
+    def train_and_evaluate(self, X_train, y_train, X_val, y_val):
+        """
+        Train CatBoost classifier and evaluate on the validation set.
+
+        Parameters:
+        - X_train, y_train: Training set features and labels.
+        - X_val, y_val: Validation set features and labels.
+        """
+        # Train a CatBoostClassifier
+        self.catboost_classifier.fit(X_train, y_train)
+
+        # Evaluate the model on the validation set
+        y_val_pred = self.catboost_classifier.predict(X_val)
+        print("Classification Report on Validation Set:")
+        print(classification_report(y_val, y_val_pred))
+
+        # Save the trained model
+        joblib.dump(self.catboost_classifier, self.model_save_path)
+
+    def predict_and_save_results(self):
+        """
+        Load test features, predict using the trained CatBoost model, and save results to a CSV file.
+        """
+        # Load test features
+        test_features = pd.read_csv(self.test_file_path)
+
+        # Handle missing values in the test set
+        missing_values_test = test_features.isna().sum()
+        if missing_values_test.any():
+            print("Missing Values in Test Set:")
+            print(missing_values_test)
+        else:
+            print("No Missing Values in Test Set")
+
+        # Remove specified features from the test set
+        test_features = test_features.drop(self.features_to_remove, axis=1)
+
+        # Normalize test features using Standard Scaling
+        test_features_scaled = self.scaler.transform(test_features)
+
+        # Use the trained CatBoostClassifier for prediction
+        predictions_catboost = self.catboost_classifier.predict(test_features_scaled)
+
+        # Save predictions to a CSV file
+        result_df_catboost = pd.DataFrame({'Id': test_features['Id'], 'Predicted_Label_CatBoost': predictions_catboost})
+        result_df_catboost.to_csv(self.result_save_path, index=False)
+
+        # Print or further process the results as needed
+        print(result_df_catboost)
+
+    def plot_correlation_matrix(self, features, save_path=None):
+        """
+        Plot and save the correlation matrix of features.
+
+        Parameters:
+        - features (pd.DataFrame): DataFrame containing features.
+        - save_path (str): Path to save the correlation matrix plot.
+        """
+        plt.figure(figsize=(16, 12))
+        correlation_matrix = features.corr()
+        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+        plt.title('Correlation Matrix of Features')
+
+        # Use default path if not provided
+        if save_path is None:
+            save_path = os.path.abspath("../../reports/figure/correlation_matrix.png")
+
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        plt.savefig(save_path)
+        plt.close()
+
+    def plot_feature_histograms(self, merged_df, save_path=None):
+        """
+        Plot and save histograms for each feature.
+
+        Parameters:
+        - merged_df (pd.DataFrame): DataFrame containing features.
+        - save_path (str): Path to save the histograms plot.
+        """
+        # Use default path if not provided
+        if save_path is None:
+            save_path = os.path.abspath("../../reports/figure/histograms.png")
+
+        # Assuming the `merged_df` is a DataFrame with 30 features
+        data1 = merged_df.iloc[:, 3:33]  # First 30 features
+
+        # Data scaling using StandardScaler
+        scaler = StandardScaler()
+        data1_scaled = pd.DataFrame(scaler.fit_transform(data1), columns=data1.columns)
+
+        # Plot histograms for each feature
+        fig, axes = plt.subplots(nrows=5, ncols=6, figsize=(15, 10))
+        fig.subplots_adjust(hspace=0.5)
+        for i, ax in enumerate(axes.flatten()):
+            if i < data1_scaled.shape[1]:
+                ax.hist(data1_scaled.iloc[:, i], bins=20, color='skyblue', edgecolor='black')
+                ax.set_title(f'Feature {i + 1}')
+
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        plt.savefig(save_path)
+        plt.close()
+
+# Class to handle training, evaluation, and prediction with CatBoost for the main classification task
+class CatBoostClassifierTrainerUSE:
+    def __init__(self, train_file_path, train_label_file_path, test_file_path, model_save_path, result_save_path):
+        """
+        Initialize CatBoostClassifierTrainer instance.
 
         Parameters:
         - train_file_path (str): Path to the training features CSV file.
@@ -449,11 +573,11 @@ class CatBoostClassifierKaggle:
         print(result_df_catboost)
 
 
-# Class to handle training, evaluation, and prediction with CatBoost for the Kaggle competition (Depreciated)
-class CatBoostClassifierKaggle_OLD:
+# Class to handle training, evaluation, and prediction with CatBoost (Depreciated)
+class CatBoostClassifierTrainer_Dummy:
     def __init__(self, train_file_path, train_label_file_path, test_file_path, model_save_path, result_save_path):
         """
-        Initialize the CatBoostClassifierKaggle with file paths and model parameters.
+        Initialize the CatBoostClassifierTrainer with file paths and model parameters.
 
         Args:
         - train_file_path (str): Path to the training data CSV file.
